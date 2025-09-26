@@ -1,0 +1,730 @@
+/* src/components/MoodAnalytics.css */
+
+.mood-analytics {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* Loading State */
+.mood-analytics.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #6c757d;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e9ecef;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Header Section */
+.analytics-header {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.analytics-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.analytics-header p {
+  margin: 0 0 2rem 0;
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+.time-filters {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  background: #fff;
+  border: 2px solid #e9ecef;
+  border-radius: 25px;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.filter-btn:hover {
+  border-color: #3498db;
+  background: #f8f9fa;
+}
+
+.filter-btn.active {
+  background: #3498db;
+  border-color: #3498db;
+  color: white;
+}
+
+/* Error Message */
+.error-message {
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  color: #721c24;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+/* Overview Section */
+.analytics-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.overview-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.overview-card:hover {
+  transform: translateY(-4px);
+}
+
+.overview-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #3498db;
+  margin-bottom: 0.5rem;
+  line-height: 1;
+}
+
+.overview-label {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Analytics Sections */
+.analytics-sections {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 1024px) {
+  .analytics-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mood Distribution Section */
+.mood-distribution-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mood-distribution-section h3 {
+  margin: 0 0 2rem 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.mood-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.mood-bar {
+  display: grid;
+  grid-template-columns: 180px 1fr 60px;
+  align-items: center;
+  gap: 1rem;
+}
+
+.mood-bar-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mood-emoji {
+  font-size: 1.5rem;
+}
+
+.mood-name {
+  font-weight: 500;
+  color: #2c3e50;
+  min-width: 80px;
+}
+
+.mood-count {
+  background: #f8f9fa;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6c757d;
+}
+
+.mood-bar-container {
+  background: #f8f9fa;
+  border-radius: 10px;
+  height: 20px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mood-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.8s ease;
+  position: relative;
+}
+
+.mood-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.mood-percentage {
+  text-align: right;
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Trends Section */
+.trends-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.trends-section h3 {
+  margin: 0 0 2rem 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.timeline-chart {
+  width: 100%;
+}
+
+.timeline-bars {
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  height: 200px;
+  padding: 1rem 0;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.timeline-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #3498db 0%, #2980b9 100%);
+  border-radius: 4px 4px 0 0;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  min-height: 2px;
+}
+
+.timeline-bar-fill:hover {
+  background: linear-gradient(180deg, #2980b9 0%, #1f5f8b 100%);
+  transform: scaleY(1.05);
+}
+
+.timeline-date {
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+/* Insights Section */
+.insights-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.insights-section h3 {
+  margin: 0 0 2rem 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.insight-card {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 10px;
+  padding: 1.5rem;
+  border-left: 4px solid #3498db;
+  transition: all 0.2s ease;
+}
+
+.insight-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.insight-card:nth-child(2) {
+  border-left-color: #2ecc71;
+}
+
+.insight-card:nth-child(3) {
+  border-left-color: #f39c12;
+}
+
+.insight-card:nth-child(4) {
+  border-left-color: #9b59b6;
+}
+
+.insight-card h4 {
+  margin: 0 0 1rem 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.insight-card p {
+  margin: 0;
+  color: #495057;
+  line-height: 1.5;
+}
+
+.insight-card strong {
+  color: #2c3e50;
+}
+
+/* Refresh Button */
+/* Refresh Button (continued) */
+.refresh-btn {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.refresh-btn:hover {
+  background: linear-gradient(135deg, #2980b9 0%, #1f5f8b 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+}
+
+.refresh-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .mood-analytics {
+    padding: 1rem;
+  }
+
+  .analytics-header {
+    padding: 1.5rem;
+  }
+
+  .analytics-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .time-filters {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .filter-btn {
+    width: 200px;
+  }
+
+  .analytics-overview {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+
+  .overview-card {
+    padding: 1.5rem;
+  }
+
+  .overview-number {
+    font-size: 2rem;
+  }
+
+  .mood-distribution-section,
+  .trends-section,
+  .insights-section {
+    padding: 1.5rem;
+  }
+
+  .mood-bar {
+    grid-template-columns: 140px 1fr 50px;
+    gap: 0.5rem;
+  }
+
+  .mood-bar-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .mood-name {
+    font-size: 0.8rem;
+    min-width: auto;
+  }
+
+  .mood-count {
+    align-self: flex-start;
+  }
+
+  .insights-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .insight-card {
+    padding: 1rem;
+  }
+
+  .timeline-bars {
+    height: 150px;
+    gap: 2px;
+  }
+
+  .timeline-date {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .analytics-header {
+    padding: 1rem;
+  }
+
+  .analytics-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .analytics-header p {
+    font-size: 1rem;
+  }
+
+  .overview-card {
+    padding: 1rem;
+  }
+
+  .overview-number {
+    font-size: 1.8rem;
+  }
+
+  .mood-bar {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    text-align: center;
+  }
+
+  .mood-bar-header {
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .mood-chart {
+    gap: 1rem;
+  }
+
+  .timeline-bars {
+    height: 120px;
+  }
+
+  .refresh-btn {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+  }
+}
+
+/* Dark Mode Support (Optional) */
+@media (prefers-color-scheme: dark) {
+  .mood-analytics {
+    background: #1a1a1a;
+    color: #e9ecef;
+  }
+
+  .analytics-header,
+  .mood-distribution-section,
+  .trends-section,
+  .insights-section,
+  .overview-card {
+    background: #2c2c2c;
+    color: #e9ecef;
+  }
+
+  .analytics-header h2,
+  .mood-distribution-section h3,
+  .trends-section h3,
+  .insights-section h3 {
+    color: #f8f9fa;
+  }
+
+  .filter-btn {
+    background: #3c3c3c;
+    border-color: #555;
+    color: #e9ecef;
+  }
+
+  .filter-btn:hover {
+    background: #4c4c4c;
+    border-color: #3498db;
+  }
+
+  .filter-btn.active {
+    background: #3498db;
+    border-color: #3498db;
+    color: white;
+  }
+
+  .mood-bar-container {
+    background: #3c3c3c;
+  }
+
+  .timeline-bars {
+    border-bottom-color: #555;
+  }
+
+  .insight-card {
+    background: linear-gradient(135deg, #3c3c3c 0%, #2c2c2c 100%);
+    color: #e9ecef;
+  }
+
+  .insight-card h4,
+  .insight-card strong {
+    color: #f8f9fa;
+  }
+
+  .mood-count {
+    background: #3c3c3c;
+    color: #adb5bd;
+  }
+
+  .error-message {
+    background-color: #542426;
+    border-color: #4a2024;
+    color: #f8d7da;
+  }
+}
+
+/* Animation Classes */
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-up {
+  animation: slideUp 0.6s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Accessibility Improvements */
+.filter-btn:focus,
+.refresh-btn:focus {
+  outline: 2px solid #3498db;
+  outline-offset: 2px;
+}
+
+.timeline-bar-fill:focus {
+  outline: 2px solid #3498db;
+  outline-offset: 1px;
+}
+
+/* Print Styles */
+@media print {
+  .mood-analytics {
+    background: white !important;
+    color: black !important;
+    padding: 0;
+  }
+
+  .refresh-btn,
+  .time-filters {
+    display: none;
+  }
+
+  .analytics-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .overview-card,
+  .mood-distribution-section,
+  .trends-section,
+  .insights-section {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    break-inside: avoid;
+  }
+}
+
+/* Scrollbar Styling (Webkit browsers) */
+.mood-analytics::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mood-analytics::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.mood-analytics::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.mood-analytics::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .overview-card,
+  .mood-distribution-section,
+  .trends-section,
+  .insights-section {
+    border: 2px solid #000;
+  }
+
+  .filter-btn.active {
+    background: #000;
+    color: #fff;
+  }
+
+  .mood-bar-fill {
+    border: 1px solid #000;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .mood-bar-fill,
+  .timeline-bar-fill,
+  .overview-card,
+  .insight-card,
+  .refresh-btn {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+
+  .mood-bar-fill::after {
+    animation: none;
+  }
+
+  .fade-in,
+  .slide-up {
+    animation: none;
+  }
+}
