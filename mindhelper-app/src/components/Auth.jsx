@@ -1,15 +1,19 @@
 // src/components/Auth.jsx
 import React, { useState } from 'react';
+import { apiService } from '../services/api';
 import './Auth.css';
 
 const Auth = ({ onLogin }) => {
   const [activeTab, setActiveTab] = useState('student-login');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     studentId: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    age: ''
   });
 
   const handleInputChange = (e) => {
@@ -18,36 +22,59 @@ const Auth = ({ onLogin }) => {
       ...prev,
       [name]: value
     }));
+    setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Simple validation
-    if (activeTab.includes('register') && formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
-      return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const isLogin = activeTab.includes('login');
+      const isStudent = activeTab.includes('student');
+
+      if (!isLogin && formData.password !== formData.confirmPassword) {
+        throw new Error('Passwords do not match');
+      }
+
+      if (isLogin) {
+        // Login
+        const result = await apiService.login({
+          email: formData.email,
+          password: formData.password
+        });
+        
+        onLogin(result, result.is_admin);
+      } else {
+        // Register
+        const userData = {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          age: formData.age ? parseInt(formData.age) : null,
+          student_id: formData.studentId
+        };
+
+        const result = await apiService.register(userData);
+        onLogin(result, result.is_admin);
+      }
+
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        studentId: '',
+        confirmPassword: '',
+        age: ''
+      });
+
+    } catch (error) {
+      setError(error.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
     }
-
-    // Simulate authentication (in real app, this would call an API)
-    const userData = {
-      id: Date.now(),
-      name: formData.name,
-      email: formData.email,
-      studentId: formData.studentId,
-      ...(activeTab.includes('admin') && { role: 'admin' })
-    };
-
-    onLogin(userData, activeTab.includes('admin'));
-
-    // Reset form
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      studentId: '',
-      confirmPassword: ''
-    });
   };
 
   const isLogin = activeTab.includes('login');
@@ -61,15 +88,23 @@ const Auth = ({ onLogin }) => {
           <p>Supporting student mental health and well-being</p>
         </div>
 
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+
         <div className="auth-tabs">
           <div className="role-selector">
             <button 
+              type="button"
               className={`role-btn ${isStudent ? 'active' : ''}`}
               onClick={() => setActiveTab(isLogin ? 'student-login' : 'student-register')}
             >
               Student
             </button>
             <button 
+              type="button"
               className={`role-btn ${!isStudent ? 'active' : ''}`}
               onClick={() => setActiveTab(isLogin ? 'admin-login' : 'admin-register')}
             >
@@ -79,12 +114,14 @@ const Auth = ({ onLogin }) => {
 
           <div className="auth-type">
             <button 
+              type="button"
               className={`auth-type-btn ${isLogin ? 'active' : ''}`}
               onClick={() => setActiveTab(isStudent ? 'student-login' : 'admin-login')}
             >
               Login
             </button>
             <button 
+              type="button"
               className={`auth-type-btn ${!isLogin ? 'active' : ''}`}
               onClick={() => setActiveTab(isStudent ? 'student-register' : 'admin-register')}
             >
@@ -95,35 +132,52 @@ const Auth = ({ onLogin }) => {
 
         <form onSubmit={handleSubmit} className="auth-form">
           {!isLogin && (
-            <div className="form-group">
-              <label htmlFor="name">Full Name</label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-          )}
+            <>
+              <div className="form-group">
+                <label htmlFor="name">Full Name *</label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  required
+                  disabled={loading}
+                />
+              </div>
 
-          {isStudent && !isLogin && (
-            <div className="form-group">
-              <label htmlFor="studentId">Student ID</label>
-              <input
-                type="text"
-                id="studentId"
-                name="studentId"
-                value={formData.studentId}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
+              {isStudent && (
+                <div className="form-group">
+                  <label htmlFor="studentId">Student ID</label>
+                  <input
+                    type="text"
+                    id="studentId"
+                    name="studentId"
+                    value={formData.studentId}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                  />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="age">Age</label>
+                <input
+                  type="number"
+                  id="age"
+                  name="age"
+                  value={formData.age}
+                  onChange={handleInputChange}
+                  min="16"
+                  max="100"
+                  disabled={loading}
+                />
+              </div>
+            </>
           )}
 
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">Email *</label>
             <input
               type="email"
               id="email"
@@ -131,11 +185,12 @@ const Auth = ({ onLogin }) => {
               value={formData.email}
               onChange={handleInputChange}
               required
+              disabled={loading}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">Password *</label>
             <input
               type="password"
               id="password"
@@ -144,12 +199,13 @@ const Auth = ({ onLogin }) => {
               onChange={handleInputChange}
               required
               minLength="6"
+              disabled={loading}
             />
           </div>
 
           {!isLogin && (
             <div className="form-group">
-              <label htmlFor="confirmPassword">Confirm Password</label>
+              <label htmlFor="confirmPassword">Confirm Password *</label>
               <input
                 type="password"
                 id="confirmPassword"
@@ -158,6 +214,7 @@ const Auth = ({ onLogin }) => {
                 onChange={handleInputChange}
                 required
                 minLength="6"
+                disabled={loading}
               />
             </div>
           )}
@@ -170,13 +227,17 @@ const Auth = ({ onLogin }) => {
                 id="adminCode"
                 name="adminCode"
                 placeholder="Enter admin access code"
-                required
+                disabled={loading}
               />
             </div>
           )}
 
-          <button type="submit" className="submit-btn">
-            {isLogin ? 'Login' : 'Register'}
+          <button 
+            type="submit" 
+            className="submit-btn"
+            disabled={loading}
+          >
+            {loading ? 'Processing...' : (isLogin ? 'Login' : 'Register')}
           </button>
         </form>
 
@@ -185,8 +246,10 @@ const Auth = ({ onLogin }) => {
             <p>
               Don't have an account?{' '}
               <button 
+                type="button"
                 className="link-btn"
                 onClick={() => setActiveTab(isStudent ? 'student-register' : 'admin-register')}
+                disabled={loading}
               >
                 {isStudent ? 'Student' : 'Admin'} Register
               </button>
@@ -195,8 +258,10 @@ const Auth = ({ onLogin }) => {
             <p>
               Already have an account?{' '}
               <button 
+                type="button"
                 className="link-btn"
                 onClick={() => setActiveTab(isStudent ? 'student-login' : 'admin-login')}
+                disabled={loading}
               >
                 {isStudent ? 'Student' : 'Admin'} Login
               </button>
