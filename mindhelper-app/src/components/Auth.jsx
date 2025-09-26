@@ -11,9 +11,10 @@ const Auth = ({ onLogin }) => {
     name: '',
     email: '',
     password: '',
-    studentId: '',
-    confirmPassword: '',
-    age: ''
+    confirm_password: '',
+    student_id: '',
+    age: '',
+    role: 'student'
   });
 
   const handleInputChange = (e) => {
@@ -30,12 +31,34 @@ const Auth = ({ onLogin }) => {
       name: isAdmin ? 'Demo Admin' : 'Demo Student',
       email: isAdmin ? 'admin@demo.com' : 'student@demo.com',
       password: '123456',
-      confirmPassword: '123456',
-      studentId: isAdmin ? '' : 'STU12345',
-      age: '21'
+      confirm_password: '123456',
+      student_id: isAdmin ? '' : 'STU12345',
+      age: isAdmin ? '30' : '21',
+      role: isAdmin ? 'admin' : 'student'
     });
     setActiveTab(isAdmin ? 'admin-login' : 'student-login');
     setError('');
+  };
+
+  const validateForm = () => {
+    const isLogin = activeTab.includes('login');
+    
+    if (!formData.email || !formData.password) {
+      throw new Error('Email and password are required');
+    }
+
+    if (!isLogin) {
+      if (!formData.name) throw new Error('Name is required');
+      if (formData.password !== formData.confirm_password) {
+        throw new Error('Passwords do not match');
+      }
+      if (formData.password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+      if (formData.age && (parseInt(formData.age) < 16 || parseInt(formData.age) > 100)) {
+        throw new Error('Age must be between 16 and 100');
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -44,20 +67,10 @@ const Auth = ({ onLogin }) => {
     setError('');
 
     try {
+      validateForm();
+
       const isLogin = activeTab.includes('login');
       const isStudent = activeTab.includes('student');
-
-      // Basic validation
-      if (!formData.email || !formData.password) {
-        throw new Error('Email and password are required');
-      }
-
-      if (!isLogin) {
-        if (!formData.name) throw new Error('Name is required');
-        if (formData.password !== formData.confirmPassword) {
-          throw new Error('Passwords do not match');
-        }
-      }
 
       let result;
       if (isLogin) {
@@ -66,22 +79,27 @@ const Auth = ({ onLogin }) => {
           password: formData.password
         });
       } else {
-        result = await apiService.register({
+        const registerData = {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          confirm_password: formData.confirm_password,
+          role: isStudent ? 'student' : 'admin',
           age: formData.age ? parseInt(formData.age) : null,
-          student_id: formData.studentId
-        });
+          student_id: formData.student_id || null
+        };
+        
+        result = await apiService.register(registerData);
       }
 
-      if (result.success) {
-        onLogin(result, result.is_admin);
+      if (result.success || result.token) {
+        onLogin(result.user || result, result.is_admin || result.user?.role === 'admin');
       } else {
-        throw new Error(result.detail || 'Authentication failed');
+        throw new Error('Authentication failed');
       }
 
     } catch (error) {
+      console.error('Auth error:', error);
       setError(error.message || 'Authentication failed. Please try again.');
     } finally {
       setLoading(false);
@@ -96,7 +114,7 @@ const Auth = ({ onLogin }) => {
       <div className="auth-card">
         <div className="auth-header">
           <h1>Student Wellness Platform</h1>
-          <p>Mental Health Support System</p>
+          <p>Mental Health Support System v2.0</p>
         </div>
 
         {error && (
@@ -177,21 +195,24 @@ const Auth = ({ onLogin }) => {
                 required
                 disabled={loading}
                 placeholder="Enter your full name"
+                minLength="2"
+                maxLength="100"
               />
             </div>
           )}
 
           {!isLogin && isStudent && (
             <div className="form-group">
-              <label htmlFor="studentId">Student ID</label>
+              <label htmlFor="student_id">Student ID</label>
               <input
                 type="text"
-                id="studentId"
-                name="studentId"
-                value={formData.studentId}
+                id="student_id"
+                name="student_id"
+                value={formData.student_id}
                 onChange={handleInputChange}
                 disabled={loading}
                 placeholder="Optional student ID"
+                maxLength="20"
               />
             </div>
           )}
@@ -224,6 +245,7 @@ const Auth = ({ onLogin }) => {
               required
               disabled={loading}
               placeholder="your.email@example.com"
+              maxLength="255"
             />
           </div>
 
@@ -244,12 +266,12 @@ const Auth = ({ onLogin }) => {
 
           {!isLogin && (
             <div className="form-group">
-              <label htmlFor="confirmPassword">Confirm Password *</label>
+              <label htmlFor="confirm_password">Confirm Password *</label>
               <input
                 type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
+                id="confirm_password"
+                name="confirm_password"
+                value={formData.confirm_password}
                 onChange={handleInputChange}
                 required
                 minLength="6"
@@ -279,6 +301,16 @@ const Auth = ({ onLogin }) => {
           <p className="password-hint">
             Demo accounts password: <code>123456</code>
           </p>
+          <div className="features-list">
+            <h4>Security Features:</h4>
+            <ul>
+              <li>✓ JWT Token Authentication</li>
+              <li>✓ BCrypt Password Hashing</li>
+              <li>✓ Role-based Authorization</li>
+              <li>✓ Input Validation</li>
+              <li>✓ Secure Session Management</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

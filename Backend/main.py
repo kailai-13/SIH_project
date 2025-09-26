@@ -1,20 +1,36 @@
 # main.py
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Dict, List, Optional
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel, EmailStr, validator
+from typing import Dict, List, Optional, Union
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 import uuid
-import datetime
 import logging
+import os
+from enum import Enum
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Security settings
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# OAuth2 scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
 app = FastAPI(
     title="Mental Health Support API",
     description="Backend for Student Wellness Platform",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 # CORS middleware
@@ -26,13 +42,96 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Enums
+class UserRole(str, Enum):
+    STUDENT = "student"
+    ADMIN = "admin"
+
+class UserStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
+
+# Database schemas (in-memory for demo)
+users_db = {}
+sessions_db = {}
+bookings_db = []
+mood_entries_db = []
+
+# Pydantic models
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+class UserBase(BaseModel):
+    name: str
+    email: EmailStr
+    role: UserRole = UserRole.STUDENT
+    age: Optional[int] = None
+    student_id: Optional[str] = None
+
+class UserCreate(UserBase):
+    password: str
+    confirm_password: str
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters long')
+        return v
+    
+    @validator('confirm_password')
+    def passwords_match(cls, v, values):
+        if 'password' in values and v != values['password']:
+            raise ValueError('Passwords do not match')
+        return v
+    
+    @validator('age')
+    def validate_age(cls, v):
+        if v is not None and (v < 16 or v > 100):
+            raise ValueError('Age must be between 16 and 100')
+        return v
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserInDB(UserBase):
+    user_id: str
+    hashed_password: str
+    status: UserStatus = UserStatus.ACTIVE
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+class UserResponse(UserBase):
+    user_id: str
+    status: UserStatus
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+class ChatMessage(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+class BookingRequest(BaseModel):
+    name: str
+    date: str
+    time: str
+    concerns: Optional[str] = None
+
+class MoodEntry(BaseModel):
+    mood: str
+    note: Optional[str] = None
+
 # Simple mock chatbot for demo
 class SimpleChatbot:
     def start_session(self, user_id):
         return "Hello! I'm your mental health support assistant. I'm here to listen and help you with stress, anxiety, or any concerns you might have. What's on your mind today?"
     
     def process_message(self, user_id, message):
-        # Simple response logic for demo
         message_lower = message.lower()
         
         if any(word in message_lower for word in ['stress', 'stressed', 'pressure']):
@@ -55,186 +154,213 @@ class SimpleChatbot:
 
 chatbot = SimpleChatbot()
 
-# Data storage (in production, use a database)
-users_db = {}
-sessions_db = {}
-bookings_db = []
-mood_entries_db = []
+# Utility functions
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-# Pydantic models
-class UserRegister(BaseModel):
-    name: str
-    email: str
-    password: str
-    age: Optional[int] = None
-    student_id: Optional[str] = None
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-class UserLogin(BaseModel):
-    email: str
-    password: str
+def get_user_by_email(email: str):
+    for user in users_db.values():
+        if user.email == email:
+            return user
+    return None
 
-class ChatMessage(BaseModel):
-    message: str
-    session_id: Optional[str] = None
+def get_user_by_id(user_id: str):
+    return users_db.get(user_id)
 
-class BookingRequest(BaseModel):
-    name: str
-    date: str
-    time: str
-    concerns: Optional[str] = None
+def authenticate_user(email: str, password: str):
+    user = get_user_by_email(email)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
 
-class MoodEntry(BaseModel):
-    mood: str
-    note: Optional[str] = None
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-# Authentication dependency
-async def get_current_user(authorization: str = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-    
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
-        # Handle both "Bearer token" and just "token" formats
-        if authorization.startswith("Bearer "):
-            token = authorization.replace("Bearer ", "").strip()
-        else:
-            token = authorization.strip()
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    
+    user = get_user_by_email(username)
+    if user is None:
+        raise credentials_exception
+    
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is not active"
+        )
+    
+    return user
+
+async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
+    return current_user
+
+def require_role(allowed_roles: List[UserRole]):
+    def role_checker(current_user: UserInDB = Depends(get_current_active_user)):
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions"
+            )
+        return current_user
+    return role_checker
+
+# Demo users initialization
+def init_demo_users():
+    if not users_db:  # Only initialize if empty
+        demo_users = [
+            {
+                "name": "Demo Student",
+                "email": "student@demo.com",
+                "password": "123456",
+                "role": UserRole.STUDENT,
+                "age": 21,
+                "student_id": "STU12345"
+            },
+            {
+                "name": "Demo Admin",
+                "email": "admin@demo.com",
+                "password": "123456",
+                "role": UserRole.ADMIN,
+                "age": 30,
+                "student_id": None
+            }
+        ]
         
-        if token in sessions_db:
-            return sessions_db[token]
-        else:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid authorization")
+        for user_data in demo_users:
+            user_id = str(uuid.uuid4())
+            user = UserInDB(
+                user_id=user_id,
+                name=user_data["name"],
+                email=user_data["email"],
+                hashed_password=get_password_hash(user_data["password"]),
+                role=user_data["role"],
+                age=user_data["age"],
+                student_id=user_data["student_id"],
+                status=UserStatus.ACTIVE,
+                created_at=datetime.utcnow()
+            )
+            users_db[user_id] = user
+            logger.info(f"Demo user created: {user_data['email']}")
 
 # Routes
-@app.post("/auth/register")
-async def register(user_data: UserRegister):
+@app.on_event("startup")
+async def startup_event():
+    init_demo_users()
+
+@app.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(user_data: UserCreate):
     try:
         # Check if user already exists
-        for user_id, user in users_db.items():
-            if user['email'] == user_data.email:
-                raise HTTPException(status_code=400, detail="Email already registered")
+        if get_user_by_email(user_data.email):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
         
         # Create new user
         user_id = str(uuid.uuid4())
-        new_user = {
-            'user_id': user_id,
-            'name': user_data.name,
-            'email': user_data.email,
-            'password': user_data.password,  # In production, hash this
-            'age': user_data.age,
-            'student_id': user_data.student_id,
-            'is_admin': user_data.email.endswith('@admin.com'),
-            'created_at': datetime.datetime.now().isoformat()
-        }
+        user = UserInDB(
+            user_id=user_id,
+            name=user_data.name,
+            email=user_data.email,
+            hashed_password=get_password_hash(user_data.password),
+            role=user_data.role,
+            age=user_data.age,
+            student_id=user_data.student_id,
+            status=UserStatus.ACTIVE,
+            created_at=datetime.utcnow()
+        )
         
-        users_db[user_id] = new_user
-        
-        # Create session
-        session_token = user_id  # Simple token for demo
-        sessions_db[session_token] = new_user
-        
+        users_db[user_id] = user
         logger.info(f"New user registered: {user_data.email}")
         
-        return {
-            "success": True,
-            "user_id": user_id,
-            "name": user_data.name,
-            "email": user_data.email,
-            "is_admin": new_user['is_admin'],
-            "token": session_token
-        }
+        return UserResponse(**user.dict())
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Registration error: {e}")
-        raise HTTPException(status_code=500, detail="Registration failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed"
+        )
 
-@app.post("/auth/login")
+@app.post("/auth/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    # Update last login
+    user.last_login = datetime.utcnow()
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/auth/login", response_model=Token)
 async def login(login_data: UserLogin):
-    try:
-        # Demo accounts for testing
-        demo_accounts = {
-            "student@demo.com": {"password": "123456", "name": "Demo Student", "is_admin": False},
-            "admin@demo.com": {"password": "123456", "name": "Demo Admin", "is_admin": True}
-        }
-        
-        # Check demo accounts first
-        if login_data.email in demo_accounts:
-            if login_data.password == demo_accounts[login_data.email]["password"]:
-                user_id = str(uuid.uuid4())
-                user_data = {
-                    'user_id': user_id,
-                    'name': demo_accounts[login_data.email]["name"],
-                    'email': login_data.email,
-                    'is_admin': demo_accounts[login_data.email]["is_admin"],
-                    'created_at': datetime.datetime.now().isoformat()
-                }
-                
-                users_db[user_id] = user_data
-                session_token = user_id
-                sessions_db[session_token] = user_data
-                
-                return {
-                    "success": True,
-                    "user_id": user_id,
-                    "name": user_data['name'],
-                    "email": user_data['email'],
-                    "is_admin": user_data['is_admin'],
-                    "token": session_token
-                }
-        
-        # Check regular users
-        user_found = None
-        for user_id, user in users_db.items():
-            if user['email'] == login_data.email:
-                if user['password'] == login_data.password:
-                    user_found = user
-                else:
-                    raise HTTPException(status_code=401, detail="Invalid password")
-                break
-        
-        if not user_found:
-            raise HTTPException(status_code=401, detail="User not found")
-        
-        session_token = user_found['user_id']
-        sessions_db[session_token] = user_found
-        
-        return {
-            "success": True,
-            "user_id": user_found['user_id'],
-            "name": user_found['name'],
-            "email": user_found['email'],
-            "is_admin": user_found['is_admin'],
-            "token": session_token
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        raise HTTPException(status_code=500, detail="Login failed")
+    user = authenticate_user(login_data.email, login_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    # Update last login
+    user.last_login = datetime.utcnow()
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/auth/me", response_model=UserResponse)
+async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
+    return UserResponse(**current_user.dict())
 
 @app.post("/auth/logout")
-async def logout(current_user: dict = Depends(get_current_user)):
-    try:
-        user_id = current_user['user_id']
-        if user_id in sessions_db:
-            del sessions_db[user_id]
-        return {"success": True, "message": "Logged out successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Logout failed")
-
-@app.get("/auth/me")
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    return current_user
+async def logout(current_user: UserInDB = Depends(get_current_active_user)):
+    return {"message": "Successfully logged out"}
 
 # Chat endpoints
 @app.post("/chat/start")
-async def start_chat(current_user: dict = Depends(get_current_user)):
+async def start_chat(current_user: UserInDB = Depends(get_current_active_user)):
     try:
-        welcome_message = chatbot.start_session(current_user['user_id'])
+        welcome_message = chatbot.start_session(current_user.user_id)
         session_id = str(uuid.uuid4())
         
         return {
@@ -248,10 +374,10 @@ async def start_chat(current_user: dict = Depends(get_current_user)):
 @app.post("/chat/message")
 async def send_message(
     chat_data: ChatMessage,
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     try:
-        result = chatbot.process_message(current_user['user_id'], chat_data.message)
+        result = chatbot.process_message(current_user.user_id, chat_data.message)
         
         return {
             "success": True,
@@ -264,23 +390,23 @@ async def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to process message")
 
-# Booking endpoints
+# Booking endpoints (student only)
 @app.post("/bookings/create")
 async def create_booking(
     booking: BookingRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(require_role([UserRole.STUDENT]))
 ):
     try:
         booking_id = str(uuid.uuid4())
         booking_data = {
             "id": booking_id,
-            "user_id": current_user['user_id'],
-            "user_name": current_user['name'],
+            "user_id": current_user.user_id,
+            "user_name": current_user.name,
             "date": booking.date,
             "time": booking.time,
             "concerns": booking.concerns,
             "status": "pending",
-            "created_at": datetime.datetime.now().isoformat()
+            "created_at": datetime.utcnow().isoformat()
         }
         
         bookings_db.append(booking_data)
@@ -289,25 +415,29 @@ async def create_booking(
         raise HTTPException(status_code=500, detail="Failed to create booking")
 
 @app.get("/bookings/my")
-async def get_my_bookings(current_user: dict = Depends(get_current_user)):
-    user_bookings = [b for b in bookings_db if b['user_id'] == current_user['user_id']]
+async def get_my_bookings(current_user: UserInDB = Depends(get_current_active_user)):
+    user_bookings = [b for b in bookings_db if b['user_id'] == current_user.user_id]
     return {"success": True, "bookings": user_bookings}
 
-# Mood endpoints
+@app.get("/bookings/all")
+async def get_all_bookings(current_user: UserInDB = Depends(require_role([UserRole.ADMIN]))):
+    return {"success": True, "bookings": bookings_db}
+
+# Mood endpoints (student only)
 @app.post("/mood/entry")
 async def add_mood_entry(
     mood_data: MoodEntry,
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(require_role([UserRole.STUDENT]))
 ):
     try:
         entry_id = str(uuid.uuid4())
         entry = {
             "id": entry_id,
-            "user_id": current_user['user_id'],
-            "user_name": current_user['name'],
+            "user_id": current_user.user_id,
+            "user_name": current_user.name,
             "mood": mood_data.mood,
             "note": mood_data.note,
-            "timestamp": datetime.datetime.now().isoformat()
+            "timestamp": datetime.utcnow().isoformat()
         }
         
         mood_entries_db.append(entry)
@@ -316,18 +446,18 @@ async def add_mood_entry(
         raise HTTPException(status_code=500, detail="Failed to add mood entry")
 
 @app.get("/mood/history")
-async def get_mood_history(current_user: dict = Depends(get_current_user)):
-    user_entries = [m for m in mood_entries_db if m['user_id'] == current_user['user_id']]
+async def get_mood_history(current_user: UserInDB = Depends(get_current_active_user)):
+    user_entries = [m for m in mood_entries_db if m['user_id'] == current_user.user_id]
     return {"success": True, "entries": user_entries}
 
 # Admin endpoints
 @app.get("/admin/stats")
-async def get_admin_stats(current_user: dict = Depends(get_current_user)):
-    if not current_user.get('is_admin', False):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
+async def get_admin_stats(current_user: UserInDB = Depends(require_role([UserRole.ADMIN]))):
     stats = {
         "total_users": len(users_db),
+        "active_users": len([u for u in users_db.values() if u.status == UserStatus.ACTIVE]),
+        "student_users": len([u for u in users_db.values() if u.role == UserRole.STUDENT]),
+        "admin_users": len([u for u in users_db.values() if u.role == UserRole.ADMIN]),
         "total_bookings": len(bookings_db),
         "total_mood_entries": len(mood_entries_db),
         "pending_bookings": len([b for b in bookings_db if b['status'] == 'pending'])
@@ -335,18 +465,24 @@ async def get_admin_stats(current_user: dict = Depends(get_current_user)):
     
     return {"success": True, "stats": stats}
 
+@app.get("/admin/users")
+async def get_all_users(current_user: UserInDB = Depends(require_role([UserRole.ADMIN]))):
+    users_list = [UserResponse(**user.dict()) for user in users_db.values()]
+    return {"success": True, "users": users_list}
+
 # Health check
 @app.get("/")
 async def root():
     return {
-        "message": "Mental Health Support API is running",
+        "message": "Mental Health Support API v2.0 is running",
         "status": "healthy",
-        "timestamp": datetime.datetime.now().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "features": ["JWT Authentication", "Role-based Authorization", "Password Hashing"]
     }
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 if __name__ == "__main__":
     import uvicorn

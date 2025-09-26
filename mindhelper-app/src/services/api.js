@@ -4,6 +4,7 @@ const API_BASE_URL = 'http://localhost:8000';
 class ApiService {
   constructor() {
     this.token = localStorage.getItem('authToken');
+    this.user = JSON.parse(localStorage.getItem('user') || 'null');
   }
 
   setToken(token) {
@@ -15,9 +16,32 @@ class ApiService {
     }
   }
 
+  setUser(user) {
+    this.user = user;
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('user');
+    }
+  }
+
   removeToken() {
     this.token = null;
+    this.user = null;
     localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  }
+
+  isAuthenticated() {
+    return !!this.token;
+  }
+
+  isAdmin() {
+    return this.user?.role === 'admin';
+  }
+
+  isStudent() {
+    return this.user?.role === 'student';
   }
 
   async request(endpoint, options = {}) {
@@ -38,14 +62,32 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      
+      // Handle non-JSON responses
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = { message: await response.text() };
+      }
 
       if (!response.ok) {
         if (response.status === 401) {
           this.removeToken();
           window.location.reload();
         }
-        throw new Error(data.detail || `HTTP error! status: ${response.status}`);
+        
+        // Handle validation errors
+        if (response.status === 422 && data.detail) {
+          const errorMessages = data.detail
+            .map(err => `${err.loc.join('.')}: ${err.msg}`)
+            .join(', ');
+          throw new Error(errorMessages);
+        }
+        
+        throw new Error(data.detail || data.message || `HTTP error! status: ${response.status}`);
       }
 
       return data;
@@ -57,16 +99,23 @@ class ApiService {
 
   // Auth endpoints
   async register(userData) {
+    // First register the user
     const result = await this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
     
-    if (result.token) {
-      this.setToken(result.token);
-    }
+    // Then automatically log them in
+    const loginResult = await this.login({
+      email: userData.email,
+      password: userData.password
+    });
     
-    return result;
+    return {
+      ...result,
+      token: loginResult.access_token,
+      token_type: loginResult.token_type
+    };
   }
 
   async login(credentials) {
@@ -75,8 +124,25 @@ class ApiService {
       body: JSON.stringify(credentials),
     });
     
-    if (result.token) {
-      this.setToken(result.token);
+    if (result.access_token) {
+      this.setToken(result.access_token);
+      
+      // Get user details
+      try {
+        const userDetails = await this.getCurrentUser();
+        this.setUser(userDetails);
+        
+        return {
+          success: true,
+          token: result.access_token,
+          token_type: result.token_type,
+          user: userDetails,
+          is_admin: userDetails.role === 'admin'
+        };
+      } catch (error) {
+        console.error('Failed to get user details:', error);
+        throw error;
+      }
     }
     
     return result;
@@ -120,6 +186,10 @@ class ApiService {
     return this.request('/bookings/my');
   }
 
+  async getAllBookings() {
+    return this.request('/bookings/all');
+  }
+
   // Mood endpoints
   async addMoodEntry(moodData) {
     return this.request('/mood/entry', {
@@ -135,6 +205,10 @@ class ApiService {
   // Admin endpoints
   async getAdminStats() {
     return this.request('/admin/stats');
+  }
+
+  async getAllUsers() {
+    return this.request('/admin/users');
   }
 }
 
