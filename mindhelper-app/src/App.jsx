@@ -1,80 +1,47 @@
 // src/App.jsx
 import React, { useState } from 'react';
 import './App.css';
-import OllamaChatbot from './components/OllamaChatbot';
-import BookingSystem from './components/BookingSystem';
-import ResourceHub from './components/ResourceHub';
-import MoodTracker from './components/MoodTracker';
+import Auth from './components/Auth';
+import StudentDashboard from './components/StudentDashboard';
 import AdminDashboard from './components/AdminDashboard';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('chatbot');
-  const [bookings, setBookings] = useState([]);
-  const [moodLogs, setMoodLogs] = useState([]);
+  const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Function to add a new booking
-  const addBooking = (booking) => {
-    const newBooking = { ...booking, id: Date.now() };
-    setBookings([...bookings, newBooking]);
+  const handleLogin = (userData, admin = false) => {
+    setUser(userData);
+    setIsAdmin(admin);
   };
 
-  // Function to add a new mood log
-  const addMoodLog = (moodLog) => {
-    const newMoodLog = { ...moodLog, id: Date.now(), timestamp: new Date().toLocaleString() };
-    setMoodLogs([...moodLogs, newMoodLog]);
+  const handleLogout = () => {
+    setUser(null);
+    setIsAdmin(false);
   };
 
   return (
     <div className="App">
-      <header className="app-header">
-        <h1>Student Wellness Platform</h1>
-        <p>Supporting student mental health and well-being</p>
-      </header>
-      
-      <nav className="main-nav">
-        <button 
-          className={activeTab === 'chatbot' ? 'active' : ''} 
-          onClick={() => setActiveTab('chatbot')}
-        >
-          AI Support
-        </button>
-        <button 
-          className={activeTab === 'booking' ? 'active' : ''} 
-          onClick={() => setActiveTab('booking')}
-        >
-          Book Counseling
-        </button>
-        <button 
-          className={activeTab === 'resources' ? 'active' : ''} 
-          onClick={() => setActiveTab('resources')}
-        >
-          Resource Hub
-        </button>
-        <button 
-          className={activeTab === 'mood' ? 'active' : ''} 
-          onClick={() => setActiveTab('mood')}
-        >
-          Mood Tracker
-        </button>
-        <button 
-          className={activeTab === 'admin' ? 'active' : ''} 
-          onClick={() => setActiveTab('admin')}
-        >
-          Counselor Dashboard
-        </button>
-      </nav>
-      
-      <main className="main-content">
-        {activeTab === 'chatbot' && <OllamaChatbot />}
-        {activeTab === 'booking' && <BookingSystem addBooking={addBooking} />}
-        {activeTab === 'resources' && <ResourceHub />}
-        {activeTab === 'mood' && <MoodTracker addMoodLog={addMoodLog} moodLogs={moodLogs} />}
-        {activeTab === 'admin' && <AdminDashboard bookings={bookings} moodLogs={moodLogs} />}
-      </main>
-      
-      <footer className="app-footer">
-        <p>Student Wellness Platform - Demo Interface for Integration with Backend</p>
-      </footer>
+      {!user ? (
+        <Auth onLogin={handleLogin} />
+      ) : (
+        <>
+          <header className="app-header">
+            <div className="header-content">
+              <h1>Student Wellness Platform</h1>
+              <div className="user-info">
+                <span>Welcome, {user.name} ({isAdmin ? 'Counselor' : 'Student'})</span>
+                <button onClick={handleLogout} className="logout-btn">Logout</button>
+              </div>
+            </div>
+          </header>
+          
+          {isAdmin ? (
+            <AdminDashboard user={user} />
+          ) : (
+            <StudentDashboard user={user} />
+          )}
+        </>
+      )}
     </div>
   );
 }
