@@ -1,4 +1,4 @@
-# main.py
+# main.py (Fully Corrected Version)
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, validator
 from typing import Dict, List, Optional, Union
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 import uuid
 import logging
 import os
@@ -20,9 +20,6 @@ logger = logging.getLogger(__name__)
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
@@ -81,6 +78,9 @@ class UserCreate(UserBase):
     def validate_password(cls, v):
         if len(v) < 6:
             raise ValueError('Password must be at least 6 characters long')
+        # Check byte length for bcrypt compatibility
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password must be 72 bytes or less')
         return v
     
     @validator('confirm_password')
@@ -154,13 +154,41 @@ class SimpleChatbot:
 
 chatbot = SimpleChatbot()
 
+# Password hashing functions using bcrypt directly
+def hash_password(password: str) -> str:
+    '''Hash a password using bcrypt'''
+    try:
+        # Convert password to bytes
+        pwd_bytes = password.encode('utf-8')
+        
+        # Check length limit for bcrypt (72 bytes max)
+        if len(pwd_bytes) > 72:
+            raise ValueError("Password too long for bcrypt (max 72 bytes)")
+        
+        # Generate salt and hash password
+        salt = bcrypt.gensalt()
+        hashed_password = bcrypt.hashpw(password=pwd_bytes, salt=salt)
+        
+        # Return as string for storage
+        return hashed_password.decode('utf-8')
+    except Exception as e:
+        logger.error(f"Password hashing error: {e}")
+        raise ValueError("Failed to hash password")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    '''Verify a password against its hash'''
+    try:
+        # Convert to bytes
+        password_bytes = plain_password.encode('utf-8')
+        hash_bytes = hashed_password.encode('utf-8')
+        
+        # Verify password
+        return bcrypt.checkpw(password=password_bytes, hashed_password=hash_bytes)
+    except Exception as e:
+        logger.error(f"Password verification error: {e}")
+        return False
+
 # Utility functions
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
 def get_user_by_email(email: str):
     for user in users_db.values():
         if user.email == email:
@@ -251,20 +279,23 @@ def init_demo_users():
         ]
         
         for user_data in demo_users:
-            user_id = str(uuid.uuid4())
-            user = UserInDB(
-                user_id=user_id,
-                name=user_data["name"],
-                email=user_data["email"],
-                hashed_password=get_password_hash(user_data["password"]),
-                role=user_data["role"],
-                age=user_data["age"],
-                student_id=user_data["student_id"],
-                status=UserStatus.ACTIVE,
-                created_at=datetime.utcnow()
-            )
-            users_db[user_id] = user
-            logger.info(f"Demo user created: {user_data['email']}")
+            try:
+                user_id = str(uuid.uuid4())
+                user = UserInDB(
+                    user_id=user_id,
+                    name=user_data["name"],
+                    email=user_data["email"],
+                    hashed_password=hash_password(user_data["password"]),
+                    role=user_data["role"],
+                    age=user_data["age"],
+                    student_id=user_data["student_id"],
+                    status=UserStatus.ACTIVE,
+                    created_at=datetime.utcnow()
+                )
+                users_db[user_id] = user
+                logger.info(f"Demo user created: {user_data['email']}")
+            except Exception as e:
+                logger.error(f"Failed to create demo user {user_data['email']}: {e}")
 
 # Routes
 @app.on_event("startup")
@@ -287,7 +318,7 @@ async def register(user_data: UserCreate):
             user_id=user_id,
             name=user_data.name,
             email=user_data.email,
-            hashed_password=get_password_hash(user_data.password),
+            hashed_password=hash_password(user_data.password),
             role=user_data.role,
             age=user_data.age,
             student_id=user_data.student_id,
@@ -306,7 +337,7 @@ async def register(user_data: UserCreate):
         logger.error(f"Registration error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Registration failed"
+            detail=str(e)
         )
 
 @app.post("/auth/token", response_model=Token)
@@ -477,7 +508,7 @@ async def root():
         "message": "Mental Health Support API v2.0 is running",
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "features": ["JWT Authentication", "Role-based Authorization", "Password Hashing"]
+        "features": ["JWT Authentication", "Direct BCrypt Hashing", "Role-based Authorization"]
     }
 
 @app.get("/health")
