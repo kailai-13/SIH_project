@@ -1,4 +1,4 @@
-// src/components/Auth.jsx
+// src/components/Auth.jsx - FIXED VERSION
 import React, { useState } from 'react';
 import { apiService } from '../services/api';
 import './Auth.css';
@@ -7,6 +7,7 @@ const Auth = ({ onLogin }) => {
   const [activeTab, setActiveTab] = useState('student-login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,9 +22,12 @@ const Auth = ({ onLogin }) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value,
+      // Auto-set role based on tab
+      role: activeTab.includes('student') ? 'student' : 'admin'
     }));
     setError('');
+    setSuccess('');
   };
 
   const fillDemoAccount = (isAdmin = false) => {
@@ -38,6 +42,7 @@ const Auth = ({ onLogin }) => {
     });
     setActiveTab(isAdmin ? 'admin-login' : 'student-login');
     setError('');
+    setSuccess('');
   };
 
   const validateForm = () => {
@@ -48,7 +53,9 @@ const Auth = ({ onLogin }) => {
     }
 
     if (!isLogin) {
-      if (!formData.name) throw new Error('Name is required');
+      if (!formData.name?.trim()) {
+        throw new Error('Name is required');
+      }
       if (formData.password !== formData.confirm_password) {
         throw new Error('Passwords do not match');
       }
@@ -65,42 +72,54 @@ const Auth = ({ onLogin }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       validateForm();
 
       const isLogin = activeTab.includes('login');
-      const isStudent = activeTab.includes('student');
 
       let result;
       if (isLogin) {
         result = await apiService.login({
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password
         });
       } else {
         const registerData = {
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
           password: formData.password,
           confirm_password: formData.confirm_password,
-          role: isStudent ? 'student' : 'admin',
+          role: activeTab.includes('student') ? 'student' : 'admin',
           age: formData.age ? parseInt(formData.age) : null,
-          student_id: formData.student_id || null
+          student_id: formData.student_id?.trim() || null
         };
         
         result = await apiService.register(registerData);
       }
 
-      if (result.success || result.token) {
-        onLogin(result.user || result, result.is_admin || result.user?.role === 'admin');
+      if (result.success && result.user) {
+        setSuccess(isLogin ? 'Login successful!' : 'Registration successful!');
+        setTimeout(() => {
+          onLogin(result.user, result.is_admin);
+        }, 1000);
       } else {
-        throw new Error('Authentication failed');
+        throw new Error('Authentication failed - no user data received');
       }
 
     } catch (error) {
       console.error('Auth error:', error);
-      setError(error.message || 'Authentication failed. Please try again.');
+      let errorMessage = error.message || 'Authentication failed. Please try again.';
+      
+      // Handle specific error cases
+      if (errorMessage.includes('Email already registered')) {
+        errorMessage = 'This email is already registered. Please try logging in instead.';
+      } else if (errorMessage.includes('Incorrect email or password')) {
+        errorMessage = 'Invalid email or password. Please check your credentials.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -120,6 +139,12 @@ const Auth = ({ onLogin }) => {
         {error && (
           <div className="error-message">
             <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="success-message">
+            <strong>Success:</strong> {success}
           </div>
         )}
 
@@ -147,7 +172,10 @@ const Auth = ({ onLogin }) => {
             <button 
               type="button"
               className={`role-btn ${isStudent ? 'active' : ''}`}
-              onClick={() => setActiveTab(isLogin ? 'student-login' : 'student-register')}
+              onClick={() => {
+                setActiveTab(isLogin ? 'student-login' : 'student-register');
+                setFormData(prev => ({ ...prev, role: 'student' }));
+              }}
               disabled={loading}
             >
               Student
@@ -155,7 +183,10 @@ const Auth = ({ onLogin }) => {
             <button 
               type="button"
               className={`role-btn ${!isStudent ? 'active' : ''}`}
-              onClick={() => setActiveTab(isLogin ? 'admin-login' : 'admin-register')}
+              onClick={() => {
+                setActiveTab(isLogin ? 'admin-login' : 'admin-register');
+                setFormData(prev => ({ ...prev, role: 'admin' }));
+              }}
               disabled={loading}
             >
               Counselor
@@ -287,7 +318,10 @@ const Auth = ({ onLogin }) => {
             disabled={loading}
           >
             {loading ? (
-              <span className="loading-spinner">Processing...</span>
+              <span className="loading-spinner">
+                <span className="spinner"></span>
+                Processing...
+              </span>
             ) : (
               isLogin ? 'Sign In' : 'Create Account'
             )}

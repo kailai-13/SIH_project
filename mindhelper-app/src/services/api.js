@@ -1,4 +1,4 @@
-// src/services/api.js
+// src/services/api.js - FIXED VERSION
 const API_BASE_URL = 'http://localhost:8000';
 
 class ApiService {
@@ -55,12 +55,15 @@ class ApiService {
       ...options,
     };
 
-    // Add authorization header if token exists
+    // Add authorization header if token exists - FIXED FORMAT
     if (this.token) {
       config.headers.Authorization = `Bearer ${this.token}`;
     }
 
     try {
+      console.log(`Making request to: ${url}`);
+      console.log(`With headers:`, config.headers);
+      
       const response = await fetch(url, config);
       
       // Handle non-JSON responses
@@ -70,19 +73,25 @@ class ApiService {
       if (contentType && contentType.includes('application/json')) {
         data = await response.json();
       } else {
-        data = { message: await response.text() };
+        const text = await response.text();
+        data = { message: text };
       }
+
+      console.log(`Response status: ${response.status}`);
+      console.log(`Response data:`, data);
 
       if (!response.ok) {
         if (response.status === 401) {
+          console.log('401 error - removing token and reloading');
           this.removeToken();
-          window.location.reload();
+          // Don't reload automatically, let the app handle it
+          throw new Error('Authentication failed. Please login again.');
         }
         
-        // Handle validation errors
+        // Handle validation errors (422)
         if (response.status === 422 && data.detail) {
           const errorMessages = data.detail
-            .map(err => `${err.loc.join('.')}: ${err.msg}`)
+            .map(err => `${err.loc?.slice(-1)[0] || 'field'}: ${err.msg}`)
             .join(', ');
           throw new Error(errorMessages);
         }
@@ -99,75 +108,100 @@ class ApiService {
 
   // Auth endpoints
   async register(userData) {
-    // First register the user
-    const result = await this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
-    
-    // Then automatically log them in
-    const loginResult = await this.login({
-      email: userData.email,
-      password: userData.password
-    });
-    
-    return {
-      ...result,
-      token: loginResult.access_token,
-      token_type: loginResult.token_type
-    };
+    try {
+      // First register the user
+      const result = await this.request('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(userData),
+      });
+      
+      console.log('Registration successful:', result);
+      
+      // Then automatically log them in
+      const loginResult = await this.login({
+        email: userData.email,
+        password: userData.password
+      });
+      
+      return {
+        success: true,
+        user: loginResult.user,
+        token: loginResult.token,
+        is_admin: loginResult.is_admin
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
   }
 
   async login(credentials) {
-    const result = await this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
-    
-    if (result.access_token) {
-      this.setToken(result.access_token);
+    try {
+      const result = await this.request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      });
       
-      // Get user details
-      try {
+      console.log('Login result:', result);
+      
+      // Handle both token formats
+      const token = result.access_token || result.token;
+      
+      if (token) {
+        this.setToken(token);
+        
+        // Get user details
         const userDetails = await this.getCurrentUser();
         this.setUser(userDetails);
         
         return {
           success: true,
-          token: result.access_token,
-          token_type: result.token_type,
+          token: token,
+          token_type: result.token_type || 'bearer',
           user: userDetails,
           is_admin: userDetails.role === 'admin'
         };
-      } catch (error) {
-        console.error('Failed to get user details:', error);
-        throw error;
+      } else {
+        throw new Error('No token received from server');
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-    
-    return result;
   }
 
   async logout() {
     try {
-      await this.request('/auth/logout', { method: 'POST' });
+      if (this.token) {
+        await this.request('/auth/logout', { method: 'POST' });
+      }
     } catch (error) {
       console.error('Logout error:', error);
+      // Continue with local cleanup even if server request fails
     } finally {
       this.removeToken();
     }
   }
 
   async getCurrentUser() {
+    if (!this.token) {
+      throw new Error('No authentication token');
+    }
     return this.request('/auth/me');
   }
 
   // Chat endpoints
   async startChat() {
+    if (!this.token) {
+      throw new Error('Authentication required');
+    }
     return this.request('/chat/start', { method: 'POST' });
   }
 
   async sendMessage(message, sessionId = null) {
+    if (!this.token) {
+      throw new Error('Authentication required');
+    }
     return this.request('/chat/message', {
       method: 'POST',
       body: JSON.stringify({ message, session_id: sessionId }),
