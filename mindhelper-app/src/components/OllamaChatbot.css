@@ -1,0 +1,108 @@
+/* src/components/OllamaChatbot.css */
+.chatbot-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.chatbot-container h2 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.chatbot-container > p {
+  color: #7f8c8d;
+  margin-bottom: 1.5rem;
+}
+
+.chat-messages {
+  height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e1e8ed;
+  border-radius: 10px;
+  padding: 1rem;
+  background-color: #fafbfc;
+  margin-bottom: 1rem;
+}
+
+.message {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.message.user {
+  background-color: #4b6cb7;
+  color: white;
+  margin-left: auto;
+  border-bottom-right-radius: 4px;
+}
+
+.message.bot {
+  background-color: #e1e8ed;
+  color: #2c3e50;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-input {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px 0 0 4px;
+  font-size: 1rem;
+}
+
+.chat-input button {
+  padding: 0.75rem 1.5rem;
+  background-color: #4b6cb7;
+  color: white;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.chat-input button:hover {
+  background-color: #3a5a9c;
+}
+
+.chat-suggestions {
+  border-top: 1px solid #e1e8ed;
+  padding-top: 1rem;
+}
+
+.chat-suggestions p {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.chat-suggestions button {
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #ecf0f1;
+  border: 1px solid #bdc3c7;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.chat-suggestions button:hover {
+  background-color: #dde4e6;
+}
+
+@media (max-width: 768px) {
+  .chat-messages {
+    height: 300px;
+  }
+  
+  .message {
+    max-width: 90%;
+  }
+}

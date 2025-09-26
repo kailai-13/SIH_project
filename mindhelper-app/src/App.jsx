@@ -1,35 +1,82 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.jsx
+import React, { useState } from 'react';
+import './App.css';
+import OllamaChatbot from './components/OllamaChatbot';
+import BookingSystem from './components/BookingSystem';
+import ResourceHub from './components/ResourceHub';
+import MoodTracker from './components/MoodTracker';
+import AdminDashboard from './components/AdminDashboard';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeTab, setActiveTab] = useState('chatbot');
+  const [bookings, setBookings] = useState([]);
+  const [moodLogs, setMoodLogs] = useState([]);
+
+  // Function to add a new booking
+  const addBooking = (booking) => {
+    const newBooking = { ...booking, id: Date.now() };
+    setBookings([...bookings, newBooking]);
+  };
+
+  // Function to add a new mood log
+  const addMoodLog = (moodLog) => {
+    const newMoodLog = { ...moodLog, id: Date.now(), timestamp: new Date().toLocaleString() };
+    setMoodLogs([...moodLogs, newMoodLog]);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+    <div className="App">
+      <header className="app-header">
+        <h1>Student Wellness Platform</h1>
+        <p>Supporting student mental health and well-being</p>
+      </header>
+      
+      <nav className="main-nav">
+        <button 
+          className={activeTab === 'chatbot' ? 'active' : ''} 
+          onClick={() => setActiveTab('chatbot')}
+        >
+          AI Support
         </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+        <button 
+          className={activeTab === 'booking' ? 'active' : ''} 
+          onClick={() => setActiveTab('booking')}
+        >
+          Book Counseling
+        </button>
+        <button 
+          className={activeTab === 'resources' ? 'active' : ''} 
+          onClick={() => setActiveTab('resources')}
+        >
+          Resource Hub
+        </button>
+        <button 
+          className={activeTab === 'mood' ? 'active' : ''} 
+          onClick={() => setActiveTab('mood')}
+        >
+          Mood Tracker
+        </button>
+        <button 
+          className={activeTab === 'admin' ? 'active' : ''} 
+          onClick={() => setActiveTab('admin')}
+        >
+          Counselor Dashboard
+        </button>
+      </nav>
+      
+      <main className="main-content">
+        {activeTab === 'chatbot' && <OllamaChatbot />}
+        {activeTab === 'booking' && <BookingSystem addBooking={addBooking} />}
+        {activeTab === 'resources' && <ResourceHub />}
+        {activeTab === 'mood' && <MoodTracker addMoodLog={addMoodLog} moodLogs={moodLogs} />}
+        {activeTab === 'admin' && <AdminDashboard bookings={bookings} moodLogs={moodLogs} />}
+      </main>
+      
+      <footer className="app-footer">
+        <p>Student Wellness Platform - Demo Interface for Integration with Backend</p>
+      </footer>
+    </div>
+  );
 }
 
-export default App
+export default App;
