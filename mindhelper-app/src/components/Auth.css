@@ -19,7 +19,7 @@
 
 .auth-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .auth-header h1 {
@@ -31,6 +31,53 @@
 .auth-header p {
   color: #7f8c8d;
   font-size: 0.9rem;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  border: 1px solid #f5c6cb;
+  font-size: 0.9rem;
+}
+
+.demo-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.demo-btn {
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.demo-btn.student {
+  background: #4CAF50;
+  color: white;
+}
+
+.demo-btn.admin {
+  background: #2196F3;
+  color: white;
+}
+
+.demo-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.demo-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .auth-tabs {
@@ -56,11 +103,17 @@
   cursor: pointer;
   font-weight: 500;
   transition: all 0.3s ease;
+  font-size: 0.9rem;
 }
 
 .role-btn.active, .auth-type-btn.active {
   background: white;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.role-btn:disabled, .auth-type-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .auth-form {
@@ -92,6 +145,12 @@
 .form-group input:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input:disabled {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
 }
 
 .submit-btn {
@@ -104,52 +163,45 @@
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease;
+  height: 48px;
 }
 
-.submit-btn:hover {
+.submit-btn:hover:not(:disabled) {
   transform: translateY(-1px);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-spinner {
+  display: inline-block;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 
 .auth-info {
   text-align: center;
   margin-top: 1.5rem;
   color: #7f8c8d;
-  font-size: 0.9rem;
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: #667eea;
-  cursor: pointer;
-  text-decoration: underline;
-  font-size: inherit;
-}
-
-.demo-accounts {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #eee;
-}
-
-.demo-accounts h3 {
-  font-size: 0.9rem;
-  color: #7f8c8d;
-  margin-bottom: 0.75rem;
-}
-
-.demo-account-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
   font-size: 0.8rem;
 }
 
-.demo-account {
-  padding: 0.5rem;
-  background: #f8f9fa;
-  border-radius: 4px;
-  border-left: 3px solid #667eea;
+.demo-hint {
+  margin-bottom: 0.5rem;
+}
+
+.password-hint code {
+  background: #f1f3f4;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: monospace;
 }
 
 @media (max-width: 480px) {
@@ -159,5 +211,9 @@
   
   .auth-header h1 {
     font-size: 1.5rem;
+  }
+  
+  .demo-buttons {
+    flex-direction: column;
   }
 }

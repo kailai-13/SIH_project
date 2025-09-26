@@ -8,7 +8,11 @@ class ApiService {
 
   setToken(token) {
     this.token = token;
-    localStorage.setItem('authToken', token);
+    if (token) {
+      localStorage.setItem('authToken', token);
+    } else {
+      localStorage.removeItem('authToken');
+    }
   }
 
   removeToken() {
@@ -18,6 +22,7 @@ class ApiService {
 
   async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
+    
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -26,22 +31,24 @@ class ApiService {
       ...options,
     };
 
+    // Add authorization header if token exists
     if (this.token) {
       config.headers.Authorization = `Bearer ${this.token}`;
     }
 
     try {
       const response = await fetch(url, config);
-      
+      const data = await response.json();
+
       if (!response.ok) {
         if (response.status === 401) {
           this.removeToken();
-          window.location.href = '/login';
+          window.location.reload();
         }
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(data.detail || `HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      return data;
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
@@ -50,10 +57,16 @@ class ApiService {
 
   // Auth endpoints
   async register(userData) {
-    return this.request('/auth/register', {
+    const result = await this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
+    
+    if (result.token) {
+      this.setToken(result.token);
+    }
+    
+    return result;
   }
 
   async login(credentials) {
@@ -70,8 +83,17 @@ class ApiService {
   }
 
   async logout() {
-    await this.request('/auth/logout', { method: 'POST' });
-    this.removeToken();
+    try {
+      await this.request('/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      this.removeToken();
+    }
+  }
+
+  async getCurrentUser() {
+    return this.request('/auth/me');
   }
 
   // Chat endpoints
@@ -86,10 +108,6 @@ class ApiService {
     });
   }
 
-  async endChat() {
-    return this.request('/chat/end', { method: 'POST' });
-  }
-
   // Booking endpoints
   async createBooking(bookingData) {
     return this.request('/bookings/create', {
@@ -102,10 +120,6 @@ class ApiService {
     return this.request('/bookings/my');
   }
 
-  async getAllBookings() {
-    return this.request('/bookings/all');
-  }
-
   // Mood endpoints
   async addMoodEntry(moodData) {
     return this.request('/mood/entry', {
@@ -116,10 +130,6 @@ class ApiService {
 
   async getMoodHistory() {
     return this.request('/mood/history');
-  }
-
-  async getMoodAnalytics() {
-    return this.request('/mood/analytics');
   }
 
   // Admin endpoints
